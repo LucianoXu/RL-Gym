@@ -13,7 +13,11 @@ if __name__ == '__main__':
 
     from src.tasks import task_train
     task_train.build_parser(subparsers)
-    # ./main train --ckpt=ckpt/lunarlanding/v1 --init
+    # ./main train --ckpt=ckpt/lunarlanding/v1 --init --device=mps
+
+    from src.tasks import task_train_bm
+    task_train_bm.build_parser(subparsers)
+    # ./main train_bm --device=mps
 
     from src.tasks import task_landingM
     task_landingM.build_parser(subparsers)
