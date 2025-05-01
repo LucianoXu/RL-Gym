@@ -1,0 +1,31 @@
+#! /usr/bin/env python3
+
+'''
+The main entry for all tasks.
+'''
+
+import argparse
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Main entry for multiple functions.")
+
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    from src.tasks import task_train
+    task_train.build_parser(subparsers)
+    # ./main train --ckpt=ckpt/lunarlanding/v1 --init
+
+    from src.tasks import task_landingM
+    task_landingM.build_parser(subparsers)
+    # ./main landingM --ckpt=lunarlanding/model_3600.pth
+
+    from src.tasks import task_landingH
+    task_landingH.build_parser(subparsers)
+    # ./main landingH
+
+
+    # Parse arguments
+    args = parser.parse_args()
+    
+    # Call the function associated with the chosen command
+    args.func(args)
