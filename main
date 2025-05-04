@@ -13,7 +13,7 @@ if __name__ == '__main__':
 
     from src.tasks import task_train
     task_train.build_parser(subparsers)
-    # ./main train --ckpt=ckpt/lunarlanding/v1 --init --device=mps
+    # ./main train --ckpt=ckpt/lunarlanding/v5 --init --arch=rmsmlp --hidden_layers=5 --grad_norm_clip=10.0 --steps=3500 --device=cpu
 
     from src.tasks import task_train_bm
     task_train_bm.build_parser(subparsers)
@@ -21,7 +21,7 @@ if __name__ == '__main__':
 
     from src.tasks import task_landingM
     task_landingM.build_parser(subparsers)
-    # ./main landingM --ckpt=lunarlanding/model_3600.pth
+    # ./main landingM --arch=rmsmlp --ckpt=ckpt/lunarlanding/v10/model_final.pth --hidden_layers=3
 
     from src.tasks import task_landingH
     task_landingH.build_parser(subparsers)

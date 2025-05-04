@@ -1,7 +1,7 @@
 
 import argparse
 from ..train import *
-from ..model import Model
+from ..model import MLP
 import os
 
 def build_parser(subparsers: argparse._SubParsersAction):
@@ -14,7 +14,7 @@ def task(parsed_args: argparse.Namespace):
     def get_lunar_landing_env():
         return gym.make("LunarLander-v3")
     
-    model = Model(obs_space=8, act_space=4, hidden_size=128, hidden_layers=2)
+    model = MLP(obs_space=8, act_space=4, hidden_size=128, hidden_layers=2)
         
     REINFORCE_benchmark(get_lunar_landing_env, 
           model=model,

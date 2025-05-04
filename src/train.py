@@ -253,6 +253,8 @@ def REINFORCE(
     lr: float = 3e-4,
     batch_size: int = 64,
 
+    grad_norm_clip: Optional[float] = None,
+
     steps: int = 1000000,
     save_interval: int = 100,
 
@@ -297,6 +299,8 @@ def REINFORCE(
 
             # get the normalized gradient
             norm_grad = get_grad_norm(model)
+            if isinstance(grad_norm_clip, float):
+                torch.nn.utils.clip_grad_norm_(model.parameters(), grad_norm_clip)
 
             optimizer.step()
             optimizer.zero_grad()

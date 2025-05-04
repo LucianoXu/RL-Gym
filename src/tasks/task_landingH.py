@@ -1,7 +1,7 @@
 
 import argparse
 from ..train import *
-from ..model import Model
+from ..model import MLP
 from ..landingH import landing
 
 def build_parser(subparsers: argparse._SubParsersAction):
