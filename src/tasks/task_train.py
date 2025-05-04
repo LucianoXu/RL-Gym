@@ -13,13 +13,15 @@ def build_parser(subparsers: argparse._SubParsersAction):
     parser.add_argument("--hidden_layers", type=int, default=2, help="Number of hidden layers in the model.")
     parser.add_argument("--grad_norm_clip", type=float, default=None, help="Gradient norm clipping value.")
     parser.add_argument("--steps", type=int, default=1000000, help="Number of training steps.")
+    parser.add_argument("--save_interval", type=int, default=100, help="Interval for saving the model.")
     parser.add_argument("--device", type=str, default='cpu', help="Device to use (cuda/cpu/mps).")
     parser.set_defaults(func=task)
 
 def task(parsed_args: argparse.Namespace):
 
-    def get_lunar_landing_env():
-        return gym.make("LunarLander-v3")
+    lunar_landing_env = {
+        "id": "LunarLander-v3",
+    }
     
     # Initialize the model
     if parsed_args.arch == "mlp":
@@ -39,11 +41,12 @@ def task(parsed_args: argparse.Namespace):
         model.load_state_dict(torch.load(parsed_args.ckpt))
 
     REINFORCE(
-        get_lunar_landing_env, 
+        lunar_landing_env, 
         ckpt=parsed_args.ckpt,
         model=model,
         lr=3e-4,
         batch_size=64,
         steps=parsed_args.steps,
+        save_interval=parsed_args.save_interval,
         grad_norm_clip=parsed_args.grad_norm_clip,
         device=parsed_args.device,)

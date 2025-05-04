@@ -1,4 +1,4 @@
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 import gymnasium as gym
 import torch
 import numpy as np
@@ -61,7 +61,7 @@ def sample_action(logits: torch.Tensor, T: float = 1.0) -> tuple[list[int], torc
 
 
 def sample_episode(
-    env_fact: Callable[[],gym.Env], 
+    env_args: dict[str, Any], 
     model: torch.nn.Module, 
     num_episodes: int = 1, 
     device: str = 'cpu') -> list[list[Record]]:
@@ -74,7 +74,7 @@ def sample_episode(
         num_episodes (int): The number of episodes to sample.
     """
 
-    envs = [env_fact() for _ in range(num_episodes)]
+    envs = [gym.make(**env_args) for _ in range(num_episodes)]
 
     # Reset the environments
     # use None to represent finished envs
@@ -98,7 +98,7 @@ def sample_episode(
                 stacked_indices.append(i)
 
         # convert to tensor
-        stacked_states = torch.tensor(stacked_states, dtype=torch.float32)
+        stacked_states = torch.tensor(np.array(stacked_states), dtype=torch.float32)
 
         # get the action
         logits = model(stacked_states)
@@ -118,6 +118,52 @@ def sample_episode(
                 current_states[idx] = obs
 
     return records
+
+@torch.no_grad()
+def render_episode(
+    env_args: dict[str, Any],
+    model: torch.nn.Module,
+    device: str = 'cpu',
+) -> torch.Tensor:
+    """
+    Sample a policy in the environment and render the episode.
+    """
+
+    # Use "rgb_array" render_mode
+    new_env_args = env_args.copy()
+    new_env_args['render_mode'] = 'rgb_array'
+
+    env = gym.make(**new_env_args)
+    current_state: list[float] = []
+    render_frames: list[np.ndarray] = []
+
+    current_state, info = env.reset()
+    frame = env.render()
+    if frame is None:
+        raise ValueError("Render mode is not set to 'rgb_array'.")
+    render_frames.append(frame)  # type: ignore
+
+    while True:
+        stacked_states = [current_state]    
+        stacked_states_tensor = torch.tensor(np.array(stacked_states), dtype=torch.float32).to(device)
+
+        logits = model(stacked_states_tensor)
+        action, _ = sample_action(logits)
+
+        obs, reward, terminated, truncated, info = env.step(action[0])
+
+        # render the frame
+        render_frames.append(env.render())  # type: ignore
+
+        if terminated or truncated:
+
+            # Log the rendered episode
+                video = np.stack(render_frames)  # shape (T, H, W, C)
+                video_tensor = torch.from_numpy(video).permute(0, 3, 1, 2).unsqueeze(0) / 255.0
+
+                return video_tensor
+        else:
+            current_state = obs
 
 
 # --------------------------------------------------------------------
@@ -181,7 +227,7 @@ def sample_episode_vector(
 
 
 def REINFORCE_benchmark(
-    env_fact: Callable[[], gym.Env],
+    env_args: dict[str, Any],
     model: torch.nn.Module,
     lr: float = 3e-4,
     batch_size: int = 64,
@@ -199,7 +245,7 @@ def REINFORCE_benchmark(
     def one_step():
         with record_function('SAMPLING'):
             # Sample a batch of episodes
-            records = sample_episode(env_fact, model, num_episodes=batch_size, device=device)
+            records = sample_episode(env_args, model, num_episodes=batch_size, device=device)
 
         # calculate the log likelihood and reward
         loglikelihood_ls, total_reward_ls = [], []
@@ -247,7 +293,7 @@ def REINFORCE_benchmark(
     
 
 def REINFORCE(
-    env_fact: Callable[[], gym.Env],
+    env_args: dict[str, Any],
     ckpt: str,
     model: torch.nn.Module,
     lr: float = 3e-4,
@@ -275,7 +321,7 @@ def REINFORCE(
         for step in range(steps):
 
             # Sample a batch of episodes
-            records = sample_episode(env_fact, model, num_episodes=batch_size, device=device)
+            records = sample_episode(env_args, model, num_episodes=batch_size, device=device)
 
             # calculate the log likelihood and reward
             loglikelihood_ls, total_reward_ls = [], []
@@ -316,6 +362,12 @@ def REINFORCE(
 
 
             if step % save_interval == 0:
+                # record the episode
+                print("Recording episode...")
+                video = render_episode(env_args, model, device=device)
+                writer.add_video("video", video, step, fps=30)
+                writer.flush()
+
                 # Save the model
                 torch.save(model.state_dict(), f"{ckpt}/model_{step}.pth")
                 print(f"Model saved at step {step}")
