@@ -6,7 +6,10 @@ import os
 
 def build_parser(subparsers: argparse._SubParsersAction):
     parser = subparsers.add_parser("train", help="Execute RL training.")
+    parser.add_argument("env", type=str, help="Environment ID.")
     parser.add_argument("--ckpt", type=str, help="Path to the checkpoint folder.", default="./ckpt/temp")
+    parser.add_argument("-i", "--input_size", type=int, default=8, help="Input size of the model.")
+    parser.add_argument("-o", "--output_size", type=int, default=4, help="Output size of the model.")
     parser.add_argument("--init", action="store_true", help="Initialize training models.")
     parser.add_argument("--arch", type=str, default="mlp", help="Model architecture (mlp/rmsmlp).")
     parser.add_argument("--hidden_size", type=int, default=128, help="Hidden size of the model.")
@@ -19,15 +22,19 @@ def build_parser(subparsers: argparse._SubParsersAction):
 
 def task(parsed_args: argparse.Namespace):
 
+    # check whether the game is available
+    if parsed_args.env not in gym.envs.registry.keys(): # type: ignore[union-attr]
+        raise ValueError(f"Environment {parsed_args.env} is not available in gym.")
+
     lunar_landing_env = {
-        "id": "LunarLander-v3",
+        "id": parsed_args.env,
     }
     
     # Initialize the model
     if parsed_args.arch == "mlp":
-        model = MLP(obs_space=8, act_space=4, hidden_size=parsed_args.hidden_size, hidden_layers=parsed_args.hidden_layers)
+        model = MLP(obs_space=parsed_args.input_size, act_space=parsed_args.output_size, hidden_size=parsed_args.hidden_size, hidden_layers=parsed_args.hidden_layers)
     elif parsed_args.arch == "rmsmlp":
-        model = RMSMLP(obs_space=8, act_space=4, hidden_size=parsed_args.hidden_size, hidden_layers=parsed_args.hidden_layers)
+        model = RMSMLP(obs_space=parsed_args.input_size, act_space=parsed_args.output_size, hidden_size=parsed_args.hidden_size, hidden_layers=parsed_args.hidden_layers)
     else:
         raise ValueError("Invalid architecture.")
 
