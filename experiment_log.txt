@@ -20,3 +20,20 @@
 
 # demonstration success
 # ./main testM LunarLander-v3 a1 --ckpt=ckpt/lunarlanding/a1-v1/model_final.pth
+
+# previous training loss recovered. usage of LeakyReLU makes learning slower
+# ./main train CartPole-v1 a0 --ckpt=ckpt/CartPole/a1-v0 --init --grad_norm_clip=10.0 --steps=3500 --save_interval=30
+
+
+# training failed. could be implementation issue.
+# ./main train Pendulum-v1 a0 --ckpt=ckpt/Pendulum/a0-v0 --init --grad_norm_clip=10.0 --steps=3500 --save_interval=30
+
+
+# use sigmoid instead of ReLU for std. training was successful, but very unstable
+# ./main train Pendulum-v1 a0 --ckpt=ckpt/Pendulum/a0-v1 --init --grad_norm_clip=10.0 --steps=3500 --save_interval=30
+
+# using deeper network. reaching -200 reward, which should be optimal. But training is much more unstable.
+# ./main train Pendulum-v1 a1 --ckpt=ckpt/Pendulum/a1-v0 --init --grad_norm_clip=10.0 --steps=3500 --save_interval=30
+
+# using smaller grad_norm_clip and larger batch size. stability improved but still a large problem. Maybe PPO can help.
+# ./main train Pendulum-v1 a1 --ckpt=ckpt/Pendulum/a1-v1 --init --grad_norm_clip=1.0 --steps=3500 --bs=256 --save_interval=30

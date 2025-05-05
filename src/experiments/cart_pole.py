@@ -6,7 +6,7 @@ class Model(nn.Module):
     def __init__(self, hidden_size: int, hidden_layers: int):
         super(Model, self).__init__()
 
-        env = gym.make("LunarLander-v3")
+        env = gym.make("CartPole-v1")
 
         self.layers = nn.Sequential(
             ContinuousInput(
@@ -31,12 +31,4 @@ def fact_a0():
     model = Model(hidden_size=128, hidden_layers=2)
     return DiscreteOutputAgent(model)
 
-register_agent_fact("LunarLander-v3", "a0", fact_a0)
-
-
-def fact_a1():
-    model = Model(hidden_size=128, hidden_layers=3)
-    return DiscreteOutputAgent(model)
-
-register_agent_fact("LunarLander-v3", "a1", fact_a1)
-
+register_agent_fact("CartPole-v1", "a0", fact_a0)
