@@ -1,6 +1,6 @@
 import torch
+from .model import Agent
 import gymnasium as gym
-from .train import sample_action
 
 
 def print_info(obs, reward, terminated, truncated, info):
@@ -15,12 +15,13 @@ def print_info(obs, reward, terminated, truncated, info):
     print(f"info: {info}")
     print("-" * 20)
     
-def landing(
-        model: torch.nn.Module
+def testM(
+        env_args: dict,
+        agent: Agent,
     ):
 
     # ---------- 2. create the environment ----------
-    env = gym.make("LunarLander-v3", render_mode="human")
+    env = gym.make(**env_args, render_mode="human")
     obs, info = env.reset()
 
 
@@ -32,8 +33,7 @@ def landing(
             step += 1
 
             # get the action from model
-            logits = model(torch.tensor([obs], dtype=torch.float32))
-            action, probs = sample_action(logits)
+            action, probs = agent.sample([obs])
 
 
             obs, reward, terminated, truncated, info = env.step(action[0])

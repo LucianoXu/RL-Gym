@@ -7,6 +7,7 @@ from utils.sys import get_command
 from utils.ml import get_grad_norm
 from torch.profiler import profile, record_function, ProfilerActivity
 from dataclasses import dataclass
+from .model import Agent
 
 # --------------------------------------------------------------------
 # 1.  tiny helper to make the vector-env
@@ -19,9 +20,9 @@ def make_async_vector_env(env_fact: Callable[[], gym.Env], n_envs: int) -> gym.v
 # --------------------------------------------------------------------
 @dataclass
 class Record:
-    obs:   np.ndarray | torch.Tensor
+    obs: Any
     reward: float
-    action: int
+    action: Any
     prob:   torch.Tensor          # scalar tensor on same device as model
     
 def calc_loglikelihood_reward(ls : list[Record], gamma: float = 1.000) -> tuple[torch.Tensor, float]:
@@ -44,25 +45,9 @@ def calc_loglikelihood_reward(ls : list[Record], gamma: float = 1.000) -> tuple[
     return loglikelihood, total_reward
 
 
-def sample_action(logits: torch.Tensor, T: float = 1.0) -> tuple[list[int], torch.Tensor]:
-    """
-    Sample an action from the logits using softmax.
-
-    Args:
-        logits (torch.Tensor): size (L, act_space) The logits from the model.
-        T (float): The temperature for softmax.
-
-    Returns:
-        The sampled action and the probability of the action.
-    """
-    probs = torch.softmax(logits / T, dim=-1)
-    action = torch.multinomial(probs, num_samples=1)
-    return action.squeeze(-1).tolist(), probs.gather(1, action).squeeze(-1)
-
-
 def sample_episode(
     env_args: dict[str, Any], 
-    model: torch.nn.Module, 
+    agent: Agent, 
     num_episodes: int = 1, 
     device: str = 'cpu') -> list[list[Record]]:
     """
@@ -97,12 +82,8 @@ def sample_episode(
                 stacked_states.append(state)
                 stacked_indices.append(i)
 
-        # convert to tensor
-        stacked_states = torch.tensor(np.array(stacked_states), dtype=torch.float32)
-
         # get the action
-        logits = model(stacked_states)
-        action, probs = sample_action(logits)
+        action, probs = agent.sample(stacked_states)
 
         for i in range(len(stacked_indices)):
             idx = stacked_indices[i]
@@ -122,7 +103,7 @@ def sample_episode(
 @torch.no_grad()
 def render_episode(
     env_args: dict[str, Any],
-    model: torch.nn.Module,
+    agent: Agent,
     device: str = 'cpu',
 ) -> torch.Tensor:
     """
@@ -144,11 +125,8 @@ def render_episode(
     render_frames.append(frame)  # type: ignore
 
     while True:
-        stacked_states = [current_state]    
-        stacked_states_tensor = torch.tensor(np.array(stacked_states), dtype=torch.float32).to(device)
 
-        logits = model(stacked_states_tensor)
-        action, _ = sample_action(logits)
+        action, _ = agent.sample([current_state])
 
         obs, reward, terminated, truncated, info = env.step(action[0])
 
@@ -166,69 +144,9 @@ def render_episode(
             current_state = obs
 
 
-# --------------------------------------------------------------------
-# vectorised sampler
-# --------------------------------------------------------------------
-def sample_episode_vector(
-    env_fact: Callable[[],gym.Env], 
-    model: torch.nn.Module, 
-    num_episodes: int = 1, 
-    device: str = 'cpu') -> list[list[Record]]:
-    """
-    Sample a policy in the environment.
-
-    Args:
-        env_fact (Callable[[], gym.Env]): A function that creates a new environment.
-        model (torch.nn.Module): The policy model.
-        num_episodes (int): The number of episodes to sample.
-    """
-
-    envs = gym.vector.AsyncVectorEnv([env_fact for _ in range(num_episodes)])
-
-    records : list[list[Record]] = [[] for _ in range(num_episodes)]
-    
-    # Reset the environments
-    # use None to represent finished envs
-    current_states, infos = envs.reset()
-
-    # remaining envs
-    unfinished_indices = list(range(num_episodes))
-
-    while len(unfinished_indices) > 0:
-
-        # get the action
-        logits = model(torch.tensor(current_states, device=device))
-        action, probs = sample_action(logits)
-
-        for i in range(num_episodes):
-            if i not in unfinished_indices:
-                action = action[:i] + [0] + action[i:]
-
-        obs, reward, terminated, truncated, info = envs.step(action)
-
-        new_current_states = []
-        new_unfinished_indices = []
-
-        for i in range(len(unfinished_indices)):
-            idx = unfinished_indices[i]
-            records[idx].append(Record(current_states[i], reward[idx], action[idx], probs[i]))
-
-            if terminated[idx] or truncated[idx]:
-                pass
-            else:
-                new_current_states.append(obs[idx])
-                new_unfinished_indices.append(idx)
-
-        current_states = new_current_states
-        unfinished_indices = new_unfinished_indices
-
-    return records
-
-
-
 def REINFORCE_benchmark(
     env_args: dict[str, Any],
-    model: torch.nn.Module,
+    agent: Agent,
     lr: float = 3e-4,
     batch_size: int = 64,
 
@@ -237,15 +155,15 @@ def REINFORCE_benchmark(
 ):
     
     
-    model.to(device)
-    model.train()
+    agent.model.to(device)
+    agent.model.train()
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(agent.model.parameters(), lr=lr)
 
     def one_step():
         with record_function('SAMPLING'):
             # Sample a batch of episodes
-            records = sample_episode(env_args, model, num_episodes=batch_size, device=device)
+            records = sample_episode(env_args, agent, num_episodes=batch_size, device=device)
 
         # calculate the log likelihood and reward
         loglikelihood_ls, total_reward_ls = [], []
@@ -295,7 +213,7 @@ def REINFORCE_benchmark(
 def REINFORCE(
     env_args: dict[str, Any],
     ckpt: str,
-    model: torch.nn.Module,
+    agent: Agent,
     lr: float = 3e-4,
     batch_size: int = 64,
 
@@ -308,10 +226,10 @@ def REINFORCE(
 ):
     
     
-    model.to(device)
-    model.train()
+    agent.model.to(device)
+    agent.model.train()
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(agent.model.parameters(), lr=lr)
 
     # write the tensorboard
     writer = tensorboard.SummaryWriter(log_dir=ckpt)
@@ -321,12 +239,12 @@ def REINFORCE(
         for step in range(steps):
 
             # Sample a batch of episodes
-            records = sample_episode(env_args, model, num_episodes=batch_size, device=device)
+            records_ls = sample_episode(env_args, agent, num_episodes=batch_size, device=device)
 
             # calculate the log likelihood and reward
             loglikelihood_ls, total_reward_ls = [], []
-            for record in records:
-                loglikelihood, total_reward = calc_loglikelihood_reward(record)
+            for records in records_ls:
+                loglikelihood, total_reward = calc_loglikelihood_reward(records)
                 loglikelihood_ls.append(loglikelihood)
                 total_reward_ls.append(total_reward)
             
@@ -335,18 +253,18 @@ def REINFORCE(
             advantage = np.array(total_reward_ls) - baseline
             J = torch.zeros(1, dtype=torch.float32, device=device)
 
-            for i in range(len(records)):
+            for i in range(len(records_ls)):
                 J += loglikelihood_ls[i] * advantage[i]
 
-            J /= -len(records)
+            J /= -len(records_ls)
 
             # Backpropagation
             J.backward()
 
             # get the normalized gradient
-            norm_grad = get_grad_norm(model)
+            norm_grad = get_grad_norm(agent.model)
             if isinstance(grad_norm_clip, float):
-                torch.nn.utils.clip_grad_norm_(model.parameters(), grad_norm_clip)
+                torch.nn.utils.clip_grad_norm_(agent.model.parameters(), grad_norm_clip)
 
             optimizer.step()
             optimizer.zero_grad()
@@ -364,16 +282,16 @@ def REINFORCE(
             if step % save_interval == 0:
                 # record the episode
                 print("Recording episode...")
-                video = render_episode(env_args, model, device=device)
+                video = render_episode(env_args, agent, device=device)
                 writer.add_video("video", video, step, fps=30)
                 writer.flush()
 
                 # Save the model
-                torch.save(model.state_dict(), f"{ckpt}/model_{step}.pth")
+                torch.save(agent.model.state_dict(), f"{ckpt}/model_{step}.pth")
                 print(f"Model saved at step {step}")
 
     finally:
         # Close the writer and save the final model
         writer.close()
-        torch.save(model.state_dict(), f"{ckpt}/model_final.pth")
+        torch.save(agent.model.state_dict(), f"{ckpt}/model_final.pth")
 

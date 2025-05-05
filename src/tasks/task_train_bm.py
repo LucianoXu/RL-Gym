@@ -1,7 +1,6 @@
 
 import argparse
 from ..train import *
-from ..model import MLP
 import os
 
 def build_parser(subparsers: argparse._SubParsersAction):

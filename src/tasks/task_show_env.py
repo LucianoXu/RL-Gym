@@ -1,7 +1,6 @@
 
 import argparse
 from ..train import *
-from ..model import MLP
 from ..landingH import landing
 import time
 

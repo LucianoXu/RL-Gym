@@ -17,27 +17,15 @@ if __name__ == '__main__':
 
     from src.tasks import task_train
     task_train.build_parser(subparsers)
-    # ./main train LunarLander-v3 --ckpt=ckpt/lunarlanding/v5 --init --arch=rmsmlp --hidden_layers=5 --grad_norm_clip=10.0 --steps=3500 --device=cpu
-
-    # very easy to train
-    # ./main train CartPole-v1 --ckpt=ckpt/CartPole/v1 --init -i 4 -o 2 --arch=rmsmlp --hidden_layers=2 --grad_norm_clip=10.0 --steps=3500 --device=cpu
-
-    # Training failed. Because the reward signal is never reached and the model is not trained in REINFORCE.
-    # ./main train MountainCar-v0 --ckpt=ckpt/MountainCar/v1 --init -i 2 -o 3 --arch=rmsmlp --hidden_layers=2 --grad_norm_clip=10.0 --steps=3500 --save_interval=30 --device=cpu
-
-    # saturate at -80 total reward. should be optimal
-    # ./main train Acrobot-v1 --ckpt=ckpt/Acrobot/v1 --init -i 6 -o 3 --arch=rmsmlp --hidden_layers=2 --grad_norm_clip=10.0 --steps=3500 --save_interval=30 --device=cpu
-
-    # same as above
-    # ./main train Acrobot-v1 --ckpt=ckpt/Acrobot/v2 --init -i 6 -o 3 --arch=rmsmlp --hidden_layers=3 --grad_norm_clip=100.0 --steps=3500 --save_interval=30 --device=cpu
+    # ./main train LunarLander-v3 a1 --ckpt=ckpt/lunarlanding/a1-v1 --init --grad_norm_clip=0.1 --steps=3500 --save_interval=30
 
     from src.tasks import task_train_bm
     task_train_bm.build_parser(subparsers)
     # ./main train_bm --device=mps
 
-    from src.tasks import task_landingM
-    task_landingM.build_parser(subparsers)
-    # ./main landingM --arch=rmsmlp --ckpt=ckpt/lunarlanding/v10/model_final.pth --hidden_layers=3
+    from src.tasks import task_testM
+    task_testM.build_parser(subparsers)
+    # ./main testM LunarLander-v3 a1 --ckpt=ckpt/lunarlanding/a1-v1/model_final.pth
 
     from src.tasks import task_landingH
     task_landingH.build_parser(subparsers)
